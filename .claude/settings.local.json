@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(unzip -o \"C:\\\\Users\\\\manuu\\\\Downloads\\\\exported_agent_NutriBug SG \\(1\\).zip\" -d ./agent_extracted)",
+      "Bash(pip install:*)",
+      "Bash(py --version)",
+      "Bash(python3 -c \"import base64, json; data=open\\(''C:/Users/manuu/OneDrive/Escritorio/nutritelegram/service_account.json''\\).read\\(\\); print\\(base64.b64encode\\(data.encode\\(\\)\\).decode\\(\\)\\)\")",
+      "Bash(C:/Users/manuu/anaconda3/python.exe -c \"import base64; data=open\\(''C:/Users/manuu/OneDrive/Escritorio/nutritelegram/service_account.json''\\).read\\(\\); print\\(base64.b64encode\\(data.encode\\(\\)\\).decode\\(\\)\\)\")"
+    ]
+  }
+}
