@@ -65,9 +65,10 @@ def call_dialogflow(text: str, session_id: str):
 
     for msg in response.query_result.response_messages:
         if msg.text.text:
-            for t in msg.text.text:
-                if t.strip():
-                    texts.append(t.strip())
+            # text.text is a list of alternatives — only use the first
+            t = msg.text.text[0].strip()
+            if t:
+                texts.append(t)
         if msg.payload:
             chips.extend(extract_chips(msg.payload))
 
