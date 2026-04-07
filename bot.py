@@ -2,11 +2,12 @@ import os
 import base64
 import logging
 import tempfile
+import asyncio
 from dotenv import load_dotenv
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton
 from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, filters, ContextTypes
 from google.cloud.dialogflowcx_v3 import SessionsClient, TextInput, QueryInput, DetectIntentRequest
-from google.protobuf.struct_pb2 import Struct
+from google.protobuf.json_format import MessageToDict
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -36,10 +37,10 @@ client = SessionsClient(client_options={"api_endpoint": api_endpoint})
 
 
 def extract_chips(payload) -> list[str]:
-    """Extract suggestion chips from a Dialogflow CX payload message."""
+    """Extract suggestion chips using MessageToDict for correct protobuf parsing."""
     chips = []
     try:
-        d = type(payload).to_dict(payload)
+        d = MessageToDict(payload)
         for block in d.get("richContent", []):
             for item in block:
                 if item.get("type") == "chips":
@@ -52,7 +53,7 @@ def extract_chips(payload) -> list[str]:
 
 
 def call_dialogflow(text: str, session_id: str):
-    """Returns list of (text, chips) tuples, one per response message group."""
+    """Returns (texts: list[str], chips: list[str])"""
     session = client.session_path(PROJECT_ID, LOCATION, AGENT_ID, session_id)
     request = DetectIntentRequest(
         session=session,
@@ -62,17 +63,15 @@ def call_dialogflow(text: str, session_id: str):
 
     texts = []
     chips = []
-
     for msg in response.query_result.response_messages:
         if msg.text.text:
-            # text.text is a list of alternatives — only use the first
             t = msg.text.text[0].strip()
             if t:
                 texts.append(t)
         if msg.payload:
             chips.extend(extract_chips(msg.payload))
 
-    log.info(f"Texts: {texts} | Chips: {chips}")
+    log.info(f"Texts({len(texts)}): {texts} | Chips({len(chips)}): {chips}")
     return texts, chips
 
 
@@ -88,7 +87,7 @@ async def handle_dialogflow(update: Update, text: str):
     if not texts:
         texts = ["Sorry, I didn't understand that."]
 
-    # Build keyboard from chips if any
+    # Build keyboard markup from chips
     if chips:
         rows = [chips[i:i+3] for i in range(0, len(chips), 3)]
         markup = ReplyKeyboardMarkup(
@@ -99,12 +98,12 @@ async def handle_dialogflow(update: Update, text: str):
     else:
         markup = ReplyKeyboardRemove()
 
-    # Send each text as a separate message; attach keyboard only to last
+    # Send each text separately; attach keyboard only to the last message
     for i, t in enumerate(texts):
-        if i == len(texts) - 1:
-            await update.message.reply_text(t, reply_markup=markup)
-        else:
-            await update.message.reply_text(t)
+        is_last = (i == len(texts) - 1)
+        await update.message.reply_text(t, reply_markup=markup if is_last else None)
+        if not is_last:
+            await asyncio.sleep(0.3)  # small delay so Telegram shows them as separate bubbles
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
